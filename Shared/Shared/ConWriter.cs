@@ -13,6 +13,12 @@ namespace Shared
         public Encoding _encoding = Encoding.UTF8;
         public int _tag = 0;
 
+        public ConWriter(Socket socket)
+        {
+            _buffer = new byte[0];
+            _socket = socket;
+        }
+
         public ConWriter(Socket socket, int tag)
         {
             _buffer = new byte[0];
@@ -20,6 +26,7 @@ namespace Shared
             _tag = tag;
             Send(tag);
         }
+
         public byte[] GetBuffer()
         {
             return _buffer;

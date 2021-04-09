@@ -42,9 +42,9 @@ namespace Servidor
             foreach (var client in server.clients)
             {
                
-                using (ConWriter conWriter = new ConWriter(client,tag))
+                using (ConWriter conWriter = new ConWriter(client))
                 {
-                    conWriter.Send();
+                    conWriter.Send(buffer);
                     conWriter.Go();
                 }
             }
@@ -56,8 +56,8 @@ namespace Servidor
          
             string texto = t.ReadString();
             Console.Out.WriteLine("Mensagem: "+texto);
-            //if (texto != null)
-                //SendToAll(texto);
+            if (texto != null)
+                SendToAll(t.GetBuffer());
 
         }
     }

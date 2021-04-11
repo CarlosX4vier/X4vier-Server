@@ -10,7 +10,6 @@ using System.Threading.Tasks;
 namespace Servidor.Listeners
 {
 
-
     class TCPListener
     {
         public static Socket _server = null;

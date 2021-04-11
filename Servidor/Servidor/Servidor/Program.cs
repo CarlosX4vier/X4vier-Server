@@ -1,6 +1,7 @@
 ﻿using Servidor.Listeners;
 using Shared;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
 using System.Threading;
@@ -36,13 +37,18 @@ namespace Servidor
 
 
 
-        private static void SendToAll(byte[] buffer)
+        private static void SendToAll(byte[] buffer, int tag, Socket[] exceptions = null)
         {
+            List<Socket> clients = server.clients;
+            if(exceptions != null)
+            {
+                clients = clients.Except(exceptions).ToList();
+            }
 
-            foreach (var client in server.clients)
+            foreach (var client in clients)
             {
                
-                using (ConWriter conWriter = new ConWriter(client))
+                using (ConWriter conWriter = new ConWriter(client,tag))
                 {
                     conWriter.Send(buffer);
                     conWriter.Go();
@@ -51,13 +57,24 @@ namespace Servidor
         }
 
         private static void Server_OnReceiveHandler(object sender, EventArgs e)
-        {
-            ConReader t = (ConReader)e;
-         
-            string texto = t.ReadString();
-            Console.Out.WriteLine("Mensagem: "+texto);
-            if (texto != null)
-                SendToAll(t.GetBuffer());
+        {         
+
+            using (ConReader t = (ConReader)e)
+            {
+                switch (t.GetTag())
+                {
+                    case 1:
+                        Console.WriteLine("ESCREVENDO");
+                        SendToAll(t.GetBuffer(),1, new Socket[]{t.GetSocket()});
+                    break;
+
+                    default:
+                        break;
+                }
+
+            }
+
+           
 
         }
     }

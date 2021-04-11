@@ -17,7 +17,8 @@ namespace Shared
         public ConReader(Socket socket)
         {
             _socket = socket;
-            _buffer = new byte[_socket.ReceiveBufferSize];
+            _buffer = new byte[1024];
+            _tag = ReadInt();
         }
 
         public ConReader(Socket socket,byte[] buffer)
@@ -25,6 +26,11 @@ namespace Shared
             _socket = socket;
             _buffer = buffer;
             _tag = ReadInt();
+        }
+
+        public Socket GetSocket()
+        {
+            return _socket;
         }
 
         public int GetTag()
@@ -57,17 +63,20 @@ namespace Shared
 
         public string ReadString()
         {
-            int size = ReadInt();
-            byte[] byteString = new byte[size];
-            Array.Copy(_buffer, _position, byteString, 0, size);
+            byte[] byteString = ReadBytes();
             string value = _encoding.GetString(byteString);
             return value;
         }
 
         public byte[] ReadBytes()
         {
-            throw new NotImplementedException();
+            int size = ReadInt();
+            byte[] byteString = new byte[size];
+            Array.Copy(_buffer, _position, byteString, 0, size);
+            byte[] value = byteString;
+            return value;
         }
+
         public void Dispose()
         {
             GC.SuppressFinalize(this);

@@ -12,21 +12,19 @@ namespace Shared
         private Socket _socket = null;
         private Encoding _encoding = Encoding.UTF8;
         private int _tag = 0;
+        private int _size = 0;
 
 
-        public ConReader(Socket socket)
-        {
-            _socket = socket;
-            _buffer = new byte[1024];
-            _tag = ReadInt();
-        }
-
-        public ConReader(Socket socket,byte[] buffer)
+        public ConReader(Socket socket, byte[] buffer)
         {
             _socket = socket;
             _buffer = buffer;
+            _size = ReadInt();
             _tag = ReadInt();
         }
+
+        public int GetSize()
+        { return _size; }
 
         public Socket GetSocket()
         {
@@ -43,10 +41,17 @@ namespace Shared
             return _buffer;
         }
 
+        public bool ReadBool()
+        {
+            bool value = BitConverter.ToBoolean(_buffer, _position);
+            _position += 1;
+            return value;
+        }
         public float ReadFloat()
         {
-            throw new NotImplementedException();
-
+            float value = BitConverter.ToSingle(_buffer, _position);
+            _position += 4;
+            return value;
         }
 
         public int ReadInt()
@@ -58,7 +63,9 @@ namespace Shared
 
         public long ReadLong()
         {
-            throw new NotImplementedException();
+            long value = BitConverter.ToInt64(_buffer, _position);
+            _position += 8;
+            return value;
         }
 
         public string ReadString()
@@ -73,6 +80,7 @@ namespace Shared
             int size = ReadInt();
             byte[] byteString = new byte[size];
             Array.Copy(_buffer, _position, byteString, 0, size);
+            _position += size;
             byte[] value = byteString;
             return value;
         }
@@ -82,6 +90,6 @@ namespace Shared
             GC.SuppressFinalize(this);
         }
 
-  
+
     }
 }

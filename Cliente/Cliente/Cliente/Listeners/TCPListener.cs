@@ -1,9 +1,7 @@
 ﻿using Shared;
 using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
 
 namespace Cliente.Listeners
@@ -13,14 +11,26 @@ namespace Cliente.Listeners
         private Socket _server = null;
         private IPAddress _ipAddress = null;
         private int _port = 0;
-        private ManualResetEvent _mre = new ManualResetEvent(false);
+        private byte[] _buffer;
+        private NetworkStream _stream;
+        public static int teste = 0;
 
-        public event EventHandler OnReceiveHandler = delegate { /*Console.WriteLine("Teste mensagem"); */};
-        public TCPListener(string ip, int port)
+        public delegate void OnReceivedHandler(ConReader reader);
+
+        public OnReceivedHandler _onReceivedHandler;
+
+        public TCPListener(string ip, int port, int maxBufferMessage, OnReceivedHandler onReceiveHandler)
         {
             _ipAddress = IPAddress.Parse(ip);
             _server = new Socket(SocketType.Stream, ProtocolType.Tcp);
             _port = port;
+            _server.ReceiveBufferSize = maxBufferMessage;
+            _server.SendBufferSize = maxBufferMessage;
+
+            _onReceivedHandler = onReceiveHandler;
+
+            _buffer = new byte[maxBufferMessage];
+
         }
 
         public Socket GetSocket()
@@ -29,37 +39,57 @@ namespace Cliente.Listeners
         }
         public void Connect()
         {
-            _mre.Reset();
-            _server.BeginConnect(_ipAddress, _port, new AsyncCallback(onConnect), _server);
-            _mre.WaitOne();
+            _server.BeginConnect(_ipAddress, _port, new AsyncCallback(onConnect), null);
         }
 
         public void onConnect(IAsyncResult a)
         {
-            Socket socket = (Socket)a.AsyncState;
-            _mre.Set();
-            socket.EndConnect(a);
-                    
+            _server.EndConnect(a);
+            _stream = new NetworkStream(_server);
+
             Console.WriteLine("Conectado");
 
-            Options options = new Options
-            {
-                buffer = new byte[socket.ReceiveBufferSize],
-                socket = socket
-            };
-            socket.BeginReceive(options.buffer, 0, options.buffer.Length, SocketFlags.None, new AsyncCallback(OnReceive), options);
+            _stream.BeginRead(_buffer, 0, _server.ReceiveBufferSize, new AsyncCallback(onReceive), null);
         }
 
-        private void OnReceive(IAsyncResult ar)
+        private void onReceive(IAsyncResult ar)
         {
-            Options options = (Options)ar.AsyncState;
-            Socket client = options.socket;
-            int read = client.EndReceive(ar);
+            int size = _stream.EndRead(ar);
+           
 
-            OnReceiveHandler.Invoke(this, new ConReader(client, options.buffer));
+            //byte[] buffer = new byte[read];
 
-            options.buffer = new byte[client.ReceiveBufferSize];
-            client.BeginReceive(options.buffer, 0, options.buffer.Length, SocketFlags.None, new AsyncCallback(OnReceive), options);
+            //Buffer.BlockCopy(_buffer, 0, buffer, 0, read);
+            //ConReader reader = new ConReader(_server, buffer);
+            //_onReceivedHandler(reader);
+
+            //_stream.BeginRead(_buffer, 0, _server.ReceiveBufferSize, new AsyncCallback(OnReceive), null);
+
+            if (size > 0)
+            {
+                int position = 0;
+                while (size > position)
+                {
+                    byte[] buffer = new byte[_server.ReceiveBufferSize];
+                    Buffer.BlockCopy(_buffer, position, buffer, 0, size);
+
+                    ConReader reader = new ConReader(_server, buffer);
+
+                    //Console.WriteLine(teste + "- POSITION =" + position + " size = " + size);
+
+                    _onReceivedHandler(reader);
+                    position += reader.GetSize();
+                }
+                teste++;
+
+                _stream.BeginRead(_buffer, 0, _server.ReceiveBufferSize, new AsyncCallback(onReceive), null);
+            }
+
+        }
+
+        public void Send(ConWriter writer)
+        {
+            _stream.BeginWrite(writer.GetBuffer(), 0, writer.GetBuffer().Length, null, null);
 
         }
     }

@@ -7,6 +7,7 @@ namespace Shared.Interfaces
     interface IConReader
     {
         byte[] GetBuffer();
+        bool ReadBool();
         string ReadString();
         int ReadInt(); 
         float ReadFloat();

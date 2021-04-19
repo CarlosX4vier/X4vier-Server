@@ -13,23 +13,30 @@ namespace Shared
         public Encoding _encoding = Encoding.UTF8;
         public int _tag = 0;
 
-        public ConWriter(Socket socket)
+
+        public ConWriter()
         {
             _buffer = new byte[0];
-            _socket = socket;
+
         }
 
-        public ConWriter(Socket socket, int tag)
+        public ConWriter(int tag)
         {
             _buffer = new byte[0];
-            _socket = socket;
             _tag = tag;
             Send(tag);
         }
 
+   
         public byte[] GetBuffer()
         {
             return _buffer;
+        }
+
+        public void SetBuffer(byte[] buffer)
+        {
+            ResizeBuffer(buffer.Length);
+            _buffer = buffer;
         }
 
         public void Send(string value)
@@ -48,10 +55,18 @@ namespace Shared
 
         public void Send(float value)
         {
+            byte[] buffer = BitConverter.GetBytes(value);
+            ResizeBuffer(buffer.Length);
+            Buffer.BlockCopy(buffer, 0, _buffer, _position, buffer.Length);
+            _position += buffer.Length;
         }
 
         public void Send(long value)
         {
+            byte[] buffer = BitConverter.GetBytes(value);
+            ResizeBuffer(buffer.Length);
+            Buffer.BlockCopy(buffer, 0, _buffer, _position, buffer.Length);
+            _position += buffer.Length;
         }
 
 
@@ -60,30 +75,35 @@ namespace Shared
             Send(value.Length);
             ResizeBuffer(value.Length);
             Buffer.BlockCopy(value, 0, _buffer, _position, value.Length);
+            _position += value.Length;
         }
 
-        public void Go()
+        public void Send(bool value)
+        {
+            byte[] buffer = BitConverter.GetBytes(value);
+            ResizeBuffer(buffer.Length);
+            Buffer.BlockCopy(buffer, 0, _buffer, _position, buffer.Length);
+            _position += buffer.Length;
+        }
+
+       /* public int Go()
         {
             try
             {
-                /*if (_socket.Poll(-1, SelectMode.SelectWrite))
-                {*/
-                    _socket.BeginSend(_buffer, 0, _buffer.Length, SocketFlags.None, null,null);
-                //}
+
+                byte[] bufferAux = BitConverter.GetBytes(_buffer.Length);
+                Array.Resize(ref bufferAux, _buffer.Length + 4);
+                Array.Copy(_buffer,0,bufferAux,4,_buffer.Length);
+
+                var t = _socket.Send(_buffer);
+                return t;
             }
             catch (Exception e)
             {
                 Console.WriteLine(e.Message);
             }
-
-        }
-
-        private void onSend(IAsyncResult ar)
-        {
-            Socket socket = (Socket)ar.AsyncState;
-            socket.EndSend(ar);
-
-        }
+            return 0;
+        }*/
 
         public void ResizeBuffer(int size)
         {
@@ -94,7 +114,5 @@ namespace Shared
         {
             GC.SuppressFinalize(this);
         }
-
-       
     }
 }

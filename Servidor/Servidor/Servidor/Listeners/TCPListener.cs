@@ -6,11 +6,12 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using TcpClient = Servidor.Clients.TcpClient;
 
 namespace Servidor.Listeners
 {
 
-    class TCPListener
+   public class TCPListener
     {
         public static Socket _server = null;
         public IPAddress _ipAddress = null;
@@ -18,16 +19,25 @@ namespace Servidor.Listeners
         public byte[] _buffer;
         public ManualResetEvent _mre = new ManualResetEvent(false);
 
-        public event EventHandler OnReceiveHandler = delegate { };
+        public delegate void OnReceiveHandler(ConReader reader);
+        public delegate void OnAcceptHandler (TcpClient socket);
+        public delegate void OnDisconnectHandler();
 
-        public List<Socket> clients = new List<Socket>();
+        public OnReceiveHandler _onReceiveHandler;
+        public OnAcceptHandler _onAcceptHandler;
 
-        public TCPListener(string ip, int port)
+        public TCPListener(string ip, int port, int maxBufferMessage, OnAcceptHandler onAcceptHandler, OnReceiveHandler onReceiveHandler)
         {
+            _onReceiveHandler = onReceiveHandler;
+            _onAcceptHandler = onAcceptHandler;
+
             _ipAddress = IPAddress.Any;
             _server = new Socket(_ipAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             _port = port;
+            _server.ReceiveBufferSize = maxBufferMessage;
+            _server.SendBufferSize = maxBufferMessage;
 
+            _buffer = new byte[maxBufferMessage];
         }
 
         public Socket GetSocket()
@@ -42,84 +52,27 @@ namespace Servidor.Listeners
 
         public void WaitConnection()
         {
-            Console.WriteLine("Aguardando conexao com cliente");
             _mre.Reset();
-            _server.BeginAccept(new AsyncCallback(Accept), _server);
+            _server.BeginAccept(new AsyncCallback(Accept), null);
             _mre.WaitOne();
         }
 
         private void Accept(IAsyncResult ar)
         {
-            Socket socket = (Socket)ar.AsyncState;
-            _mre.Set();
-            Socket client = socket.EndAccept(ar);
-          //  client.BeginDisconnect(false, new AsyncCallback(Disconnect), client);
-            clients.Add(client);
+            Socket socket = _server.EndAccept(ar);
 
-            Options options = new Options()
-            {
-                buffer = new byte[client.ReceiveBufferSize],
-                socket = client
-            };
+            TcpClient client = new TcpClient(socket,1024, _onReceiveHandler);
 
-            client.BeginReceive(options.buffer, 0, options.buffer.Length, SocketFlags.None, new AsyncCallback(OnReceive), options);
+            _onAcceptHandler(client);
 
-        }
+            _server.BeginAccept(new AsyncCallback(Accept), null);
 
-        private void OnReceive(IAsyncResult ar)
-        {
-            Options options = (Options)ar.AsyncState;
-            Socket client = options.socket;
-
-            try
-            {
-                int read = client.EndReceive(ar);
-                Console.WriteLine(client.RemoteEndPoint.ToString() + " " + client.Connected);
-
-                if (client.Connected)
-                {
-                    if (read > 0)
-                    {
-                        OnReceiveHandler.Invoke(this, new ConReader(client, options.buffer));
-
-                        byte[] teste = new byte[client.ReceiveBufferSize];
-                        options.buffer = teste;
-
-                        client.BeginReceive(teste, 0, teste.Length, SocketFlags.None, new AsyncCallback(OnReceive), options);
-
-                    }
-                    else
-                    {
-                        Disconnect(client);
-                    }
-                }
-                else
-                {
-                    Disconnect(client);
-                }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine("Error: " + e.Message);
-                Disconnect(client);
-            }
-        }
-
-        private void Disconnect(IAsyncResult ar)
-        {
-            Socket socket = (Socket)ar.AsyncState;
-            Console.WriteLine(socket.LocalEndPoint.ToString() + " desconectado");
-
-            socket.Close();
-            clients.Remove(socket);
-        }
+        }   
 
         private void Disconnect(Socket socket)
         {
             Console.WriteLine(socket.LocalEndPoint.ToString() + " desconectado");
-
             socket.Close();
-            clients.Remove(socket);
         }
     }
 }

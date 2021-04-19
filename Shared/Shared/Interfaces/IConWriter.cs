@@ -7,6 +7,7 @@ namespace Shared.Interfaces
     interface IConWriter
     {
         byte[] GetBuffer();
+        void Send(bool value);
         void Send(string value);
         void Send(int value);
         void Send(float value);

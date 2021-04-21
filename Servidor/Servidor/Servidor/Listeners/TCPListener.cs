@@ -19,16 +19,16 @@ namespace Servidor.Listeners
         public byte[] _buffer;
         public ManualResetEvent _mre = new ManualResetEvent(false);
 
-        public delegate void OnReceiveHandler(ConReader reader);
-        public delegate void OnAcceptHandler (TcpClient socket);
+        public delegate void OnReceivedHandler(IClient client, ConReader reader);
+        public delegate void OnAcceptHandler (IClient socket);
         public delegate void OnDisconnectHandler();
 
-        public OnReceiveHandler _onReceiveHandler;
+        public OnReceivedHandler _onReceivedHandler;
         public OnAcceptHandler _onAcceptHandler;
 
-        public TCPListener(string ip, int port, int maxBufferMessage, OnAcceptHandler onAcceptHandler, OnReceiveHandler onReceiveHandler)
+        public TCPListener(string ip, int port, int maxBufferMessage, OnAcceptHandler onAcceptHandler, OnReceivedHandler onReceivedHandler)
         {
-            _onReceiveHandler = onReceiveHandler;
+            _onReceivedHandler = onReceivedHandler;
             _onAcceptHandler = onAcceptHandler;
 
             _ipAddress = IPAddress.Any;
@@ -61,7 +61,7 @@ namespace Servidor.Listeners
         {
             Socket socket = _server.EndAccept(ar);
 
-            TcpClient client = new TcpClient(socket,1024, _onReceiveHandler);
+            TcpClient client = new TcpClient(socket,1024, _onReceivedHandler);
 
             _onAcceptHandler(client);
 

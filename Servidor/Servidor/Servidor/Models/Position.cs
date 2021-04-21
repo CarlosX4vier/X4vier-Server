@@ -6,8 +6,8 @@ namespace Servidor.Models
 {
     public class Position
     {
-        public long X = 0;
-        public long Y = 0;
-        public long Z = 0;
+        public float X = 0;
+        public float Y = 0;
+        public float Z = 0;
     }
 }

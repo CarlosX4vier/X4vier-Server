@@ -7,49 +7,59 @@ using static Servidor.Listeners.TCPListener;
 
 namespace Servidor.Clients
 {
-    public class TcpClient
+    public class TcpClient : IClient
     {
         private byte[] _buffer;
-        public NetworkStream _stream;
         public Socket _socket;
+        private static int teste = 0;
 
-        private OnReceiveHandler OnReceivedHandler;
+        private OnReceivedHandler _onReceivedHandler;
 
-        public TcpClient(Socket socket, int maxBufferSize, OnReceiveHandler onReceivedHandler)
+        Socket IClient._socket { get => _socket; set => _socket = value; }
+
+        public TcpClient(Socket socket, int maxBufferSize, OnReceivedHandler onReceivedHandler)
         {
             _buffer = new byte[maxBufferSize];
             _socket = socket;
-            _stream = new NetworkStream(_socket);
 
-            OnReceivedHandler = onReceivedHandler;
-            _stream.BeginRead(_buffer, 0, maxBufferSize, new AsyncCallback(onReceive), null);
+            _onReceivedHandler = onReceivedHandler;
+            _socket.BeginReceive(_buffer, 0, maxBufferSize, SocketFlags.None, new AsyncCallback(OnReceived), null);
         }
 
-        public void onReceive(IAsyncResult ar)
+        public void OnReceived(IAsyncResult ar)
         {
             try
             {
-                int size = _stream.EndRead(ar);
-                int position = 0;
+                int size = _socket.EndReceive(ar);
 
                 if (_socket.Connected)
                 {
                     if (size > 0)
                     {
-                        while (size != 0)
+                        int position = 0;
+
+                        while (size > position)
                         {
-                            Options options = new Options();
-                            options.buffer = new byte[_server.ReceiveBufferSize];
+                            byte[] buffer = new byte[_server.ReceiveBufferSize];
+                            Buffer.BlockCopy(_buffer, position, buffer, 0, size);
 
-                            Buffer.BlockCopy(_buffer, position, options.buffer, 0, size);
+                            ConReader reader = new ConReader(buffer);
+                            reader.endPoint = _socket.RemoteEndPoint;
 
-                            ConReader reader = new ConReader(_socket, options.buffer);
-                            position = reader.GetSize();
+                            //{
+                            //    Options options = new Options();
+                            //    options.buffer = new byte[_server.ReceiveBufferSize];
+                            //    Buffer.BlockCopy(_buffer, position, options.buffer, 0, size);
+                            //    ConReader reader = new ConReader(_socket, options.buffer);
+                            Console.WriteLine(teste + "- POSITION =" + position + " size = " + size);
 
-                            OnReceivedHandler(reader);
-                            size = size - position;
+                            _onReceivedHandler(this,reader);
+                            position += reader.GetSize();
+
                         }
-                        _stream.BeginRead(_buffer, 0, _server.ReceiveBufferSize, new AsyncCallback(onReceive), null);
+                        teste++;
+
+                        _socket.BeginReceive(_buffer, 0, _socket.ReceiveBufferSize,SocketFlags.None, new AsyncCallback(OnReceived), null);
 
                     }   
                     else
@@ -66,7 +76,7 @@ namespace Servidor.Clients
             }
             catch (Exception e)
             {
-                Console.WriteLine("Fechando conexao");
+                Console.WriteLine("Fechando conexao : "+e.Message);
                 _socket.Close();
             }
 
@@ -81,8 +91,8 @@ namespace Servidor.Clients
                 Array.Resize(ref bufferAux, writer._buffer.Length + 4);
                 Array.Copy(writer._buffer, 0, bufferAux, 4, writer._buffer.Length);
 
-                _stream.Write(bufferAux, 0, bufferAux.Length);
-                _stream.Flush();
+                _socket.Send(bufferAux);
+
             }
             catch (Exception e)
             {

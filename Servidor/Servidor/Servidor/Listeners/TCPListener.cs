@@ -1,17 +1,14 @@
 ﻿using Shared;
 using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
-using TcpClient = Servidor.Clients.TcpClient;
+using TcpClient = Servidor.Clients.TCPClient;
 
 namespace Servidor.Listeners
 {
 
-   public class TCPListener
+    public class TCPListener
     {
         public static Socket _server = null;
         public IPAddress _ipAddress = null;
@@ -20,19 +17,21 @@ namespace Servidor.Listeners
         public ManualResetEvent _mre = new ManualResetEvent(false);
 
         public delegate void OnReceivedHandler(IClient client, ConReader reader);
-        public delegate void OnAcceptHandler (IClient socket);
-        public delegate void OnDisconnectHandler();
+        public delegate void OnAcceptHandler(IClient client);
+        public delegate void OnDisconnectHandler(IClient client);
 
         public OnReceivedHandler _onReceivedHandler;
         public OnAcceptHandler _onAcceptHandler;
+        public OnDisconnectHandler _onDisconnectHandler;
 
-        public TCPListener(string ip, int port, int maxBufferMessage, OnAcceptHandler onAcceptHandler, OnReceivedHandler onReceivedHandler)
+        public TCPListener(string ip, int port, int maxBufferMessage, OnAcceptHandler onAcceptHandler, OnReceivedHandler onReceivedHandler, OnDisconnectHandler onDisconnectHandler)
         {
             _onReceivedHandler = onReceivedHandler;
             _onAcceptHandler = onAcceptHandler;
+            _onDisconnectHandler = onDisconnectHandler;
 
             _ipAddress = IPAddress.Any;
-            _server = new Socket(_ipAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            _server = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             _port = port;
             _server.ReceiveBufferSize = maxBufferMessage;
             _server.SendBufferSize = maxBufferMessage;
@@ -48,31 +47,19 @@ namespace Servidor.Listeners
         {
             _server.Bind(new IPEndPoint(_ipAddress, _port));
             _server.Listen(50);
-        }
-
-        public void WaitConnection()
-        {
-            _mre.Reset();
             _server.BeginAccept(new AsyncCallback(Accept), null);
-            _mre.WaitOne();
         }
 
         private void Accept(IAsyncResult ar)
         {
             Socket socket = _server.EndAccept(ar);
 
-            TcpClient client = new TcpClient(socket,1024, _onReceivedHandler);
+            TcpClient client = new TcpClient(socket, _server.ReceiveBufferSize, _onReceivedHandler, _onDisconnectHandler);
 
             _onAcceptHandler(client);
 
             _server.BeginAccept(new AsyncCallback(Accept), null);
 
-        }   
-
-        private void Disconnect(Socket socket)
-        {
-            Console.WriteLine(socket.LocalEndPoint.ToString() + " desconectado");
-            socket.Close();
         }
     }
 }

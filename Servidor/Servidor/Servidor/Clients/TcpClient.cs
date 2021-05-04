@@ -7,22 +7,24 @@ using static Servidor.Listeners.TCPListener;
 
 namespace Servidor.Clients
 {
-    public class TcpClient : IClient
+    public class TCPClient : IClient
     {
         private byte[] _buffer;
         public Socket _socket;
         private static int teste = 0;
 
         private OnReceivedHandler _onReceivedHandler;
+        private OnDisconnectHandler _onDisconnectHandler;
 
         Socket IClient._socket { get => _socket; set => _socket = value; }
 
-        public TcpClient(Socket socket, int maxBufferSize, OnReceivedHandler onReceivedHandler)
+        public TCPClient(Socket socket, int maxBufferSize, OnReceivedHandler onReceivedHandler, OnDisconnectHandler onDisconnectHandler)
         {
             _buffer = new byte[maxBufferSize];
             _socket = socket;
 
             _onReceivedHandler = onReceivedHandler;
+            _onDisconnectHandler = onDisconnectHandler;
             _socket.BeginReceive(_buffer, 0, maxBufferSize, SocketFlags.None, new AsyncCallback(OnReceived), null);
         }
 
@@ -44,40 +46,26 @@ namespace Servidor.Clients
                             Buffer.BlockCopy(_buffer, position, buffer, 0, size);
 
                             ConReader reader = new ConReader(buffer);
-                            reader.endPoint = _socket.RemoteEndPoint;
 
-                            //{
-                            //    Options options = new Options();
-                            //    options.buffer = new byte[_server.ReceiveBufferSize];
-                            //    Buffer.BlockCopy(_buffer, position, options.buffer, 0, size);
-                            //    ConReader reader = new ConReader(_socket, options.buffer);
-                            Console.WriteLine(teste + "- POSITION =" + position + " size = " + size);
-
-                            _onReceivedHandler(this,reader);
+                            _onReceivedHandler(this, reader);
                             position += reader.GetSize();
 
                         }
                         teste++;
 
-                        _socket.BeginReceive(_buffer, 0, _socket.ReceiveBufferSize,SocketFlags.None, new AsyncCallback(OnReceived), null);
+                        _socket.BeginReceive(_buffer, 0, _socket.ReceiveBufferSize, SocketFlags.None, new AsyncCallback(OnReceived), null);
 
-                    }   
+                    }
                     else
                     {
-                        Console.WriteLine("Fechando conexao");
-                        _socket.Close();
+                        Disconnect(this);
                     }
-                }
-                else
-                {
-                    Console.WriteLine("Fechando conexao");
-                    _socket.Close();
                 }
             }
             catch (Exception e)
             {
-                Console.WriteLine("Fechando conexao : "+e.Message);
-                _socket.Close();
+                Console.WriteLine("Error: " + e.StackTrace);
+                Disconnect(this);
             }
 
         }
@@ -86,8 +74,7 @@ namespace Servidor.Clients
         {
             try
             {
-                Console.WriteLine(writer._buffer.Length + 4);
-                byte[] bufferAux = BitConverter.GetBytes(writer._buffer.Length+ 4);
+                byte[] bufferAux = BitConverter.GetBytes(writer._buffer.Length + 4);
                 Array.Resize(ref bufferAux, writer._buffer.Length + 4);
                 Array.Copy(writer._buffer, 0, bufferAux, 4, writer._buffer.Length);
 
@@ -97,8 +84,15 @@ namespace Servidor.Clients
             catch (Exception e)
             {
                 Console.WriteLine("Fechando conexao " + e.Message);
-                _socket.Close();
+                Disconnect(this);
             }
+        }
+
+        private void Disconnect(IClient client)
+        {
+            Console.WriteLine(client._socket.RemoteEndPoint.ToString() + " desconectado");
+            _onDisconnectHandler(client);
+            client._socket.Close();
         }
     }
 }

@@ -3,7 +3,7 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
-using UdpClient = Servidor.Clients.UdpClient;
+using UDPClient = Servidor.Clients.UDPClient;
 
 namespace Servidor.Listeners
 {
@@ -48,8 +48,8 @@ namespace Servidor.Listeners
         {
             _server.Bind(new IPEndPoint(_ipAddress, _port));
             _server.BeginReceiveFrom(_buffer, 0, _server.ReceiveBufferSize, SocketFlags.None, ref _endPoint, new AsyncCallback(OnReceived), null);
-
         }
+
         public void OnReceived(IAsyncResult ar)
         {
             try
@@ -63,24 +63,18 @@ namespace Servidor.Listeners
                 {
                     int position = 0;
 
-                    while (size > position)
-                    {
+                  
                         byte[] buffer = new byte[_server.ReceiveBufferSize];
                         Buffer.BlockCopy(_buffer, position, buffer, 0, size);
                         ConReader reader = new ConReader(buffer);
-                        reader.endPoint = tempRemoteEP;
-                        //{
-                        //    Options options = new Options();
-                        //    options.buffer = new byte[_server.ReceiveBufferSize];
-                        //    Buffer.BlockCopy(_buffer, position, options.buffer, 0, size);
-                        //    ConReader reader = new ConReader(_socket, options.buffer);
+                        
                         Console.WriteLine(teste + "- POSITION =" + position + " size = " + size);
 
-                        UdpClient client = new UdpClient(_server, tempRemoteEP, _server.ReceiveBufferSize);
+                        UDPClient client = new UDPClient(_server, tempRemoteEP);
                         _onReceivedHandler(client, reader);
                         position += reader.GetSize();
 
-                    }
+                    
                 }
                 _server.BeginReceiveFrom(_buffer, 0, _server.ReceiveBufferSize, SocketFlags.None, ref _endPoint, new AsyncCallback(OnReceived), null);
 
@@ -90,8 +84,6 @@ namespace Servidor.Listeners
                 Console.WriteLine("Fechando conexao : " + e.StackTrace);
             }
         }
-
-
 
         private void Disconnect(Socket socket)
         {

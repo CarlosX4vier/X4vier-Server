@@ -14,6 +14,7 @@ namespace Cliente.Listeners
         private byte[] _buffer;
         public static int teste = 0;
 
+        public EndPoint _endPoint;
         public delegate void OnReceivedHandler(ConReader reader);
 
         public OnReceivedHandler _onReceivedHandler;
@@ -21,7 +22,7 @@ namespace Cliente.Listeners
         public UDPListener(string ip, int port, int maxBufferMessage, OnReceivedHandler onReceiveHandler)
         {
             _ipAddress = IPAddress.Parse(ip);
-            _server = new Socket(SocketType.Dgram, ProtocolType.Udp);
+            _server = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             _port = port;
             _server.ReceiveBufferSize = maxBufferMessage;
             _server.SendBufferSize = maxBufferMessage;
@@ -29,10 +30,10 @@ namespace Cliente.Listeners
             _onReceivedHandler = onReceiveHandler;
 
             _buffer = new byte[maxBufferMessage];
-            _server.Bind(new IPEndPoint(_ipAddress, 11000));
+            _server.Bind(new IPEndPoint(IPAddress.Any,0));
+            _endPoint = new IPEndPoint(_ipAddress, _port);
 
-            EndPoint p = new IPEndPoint(_ipAddress, _port);
-            _server.BeginReceiveFrom(_buffer, 0, _server.ReceiveBufferSize, SocketFlags.None, ref p, new AsyncCallback(OnReceived), null);
+            _server.BeginReceiveFrom(_buffer, 0, _server.ReceiveBufferSize, SocketFlags.None, ref _endPoint, new AsyncCallback(OnReceived), null);
 
 
         }
@@ -41,7 +42,7 @@ namespace Cliente.Listeners
         {
             return _server;
         }
-    
+
 
         private void OnReceived(IAsyncResult ar)
         {
@@ -51,8 +52,7 @@ namespace Cliente.Listeners
             if (size > 0)
             {
                 int position = 0;
-                while (size > position)
-                {
+              
                     byte[] buffer = new byte[_server.ReceiveBufferSize];
                     Buffer.BlockCopy(_buffer, position, buffer, 0, size);
 
@@ -62,12 +62,11 @@ namespace Cliente.Listeners
 
                     _onReceivedHandler(reader);
                     position += reader.GetSize();
-                }
+                
                 teste++;
 
-                EndPoint p = new IPEndPoint(_ipAddress, _port);
-                _server.BeginReceiveFrom(_buffer, 0, _server.ReceiveBufferSize, SocketFlags.None, ref p, new AsyncCallback(OnReceived), null);
             }
+            _server.BeginReceiveFrom(_buffer, 0, _server.ReceiveBufferSize, SocketFlags.None, ref _endPoint, new AsyncCallback(OnReceived), null);
 
         }
 
@@ -75,18 +74,18 @@ namespace Cliente.Listeners
         {
             try
             {
-               Console.WriteLine(writer._buffer.Length + 4);
+                Console.WriteLine(writer._buffer.Length + 4);
                 byte[] bufferAux = BitConverter.GetBytes(writer._buffer.Length + 4);
                 Array.Resize(ref bufferAux, writer._buffer.Length + 4);
                 Array.Copy(writer._buffer, 0, bufferAux, 4, writer._buffer.Length);
 
-                _server.SendTo(bufferAux,SocketFlags.None, new IPEndPoint(_ipAddress, _port));
+                EndPoint p = new IPEndPoint(_ipAddress, _port);
+                _server.SendTo(bufferAux, SocketFlags.None, p);
 
             }
             catch (Exception e)
             {
-                Console.WriteLine("Fechando conexao " + e.Message);
-                _server.Close();
+                throw e;
             }
 
         }

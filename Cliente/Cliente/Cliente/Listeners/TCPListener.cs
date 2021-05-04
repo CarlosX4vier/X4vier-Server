@@ -21,7 +21,7 @@ namespace Cliente.Listeners
         public TCPListener(string ip, int port, int maxBufferMessage, OnReceivedHandler onReceiveHandler)
         {
             _ipAddress = IPAddress.Parse(ip);
-            _server = new Socket(SocketType.Stream, ProtocolType.Tcp);
+            _server = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             _port = port;
             _server.ReceiveBufferSize = maxBufferMessage;
             _server.SendBufferSize = maxBufferMessage;
@@ -63,7 +63,6 @@ namespace Cliente.Listeners
                     Buffer.BlockCopy(_buffer, position, buffer, 0, size);
 
                     ConReader reader = new ConReader(buffer);
-                    reader.endPoint = _server.RemoteEndPoint;
 
                     Console.WriteLine(teste + "- POSITION =" + position + " size = " + size);
 

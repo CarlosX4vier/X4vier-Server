@@ -23,7 +23,7 @@ namespace Shared
         public int GetSize()
         { return _size; }
 
-      
+
         public int GetTag()
         {
             return _tag;
@@ -82,7 +82,5 @@ namespace Shared
         {
             GC.SuppressFinalize(this);
         }
-
-
     }
 }

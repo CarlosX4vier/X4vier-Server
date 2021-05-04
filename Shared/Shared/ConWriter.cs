@@ -28,7 +28,7 @@ namespace Shared
             Send(tag);
         }
 
-   
+
         public byte[] GetBuffer()
         {
             return _buffer;
@@ -86,26 +86,6 @@ namespace Shared
             Buffer.BlockCopy(buffer, 0, _buffer, _position, buffer.Length);
             _position += buffer.Length;
         }
-
-       /* public int Go()
-        {
-            try
-            {
-
-                byte[] bufferAux = BitConverter.GetBytes(_buffer.Length);
-                Array.Resize(ref bufferAux, _buffer.Length + 4);
-                Array.Copy(_buffer,0,bufferAux,4,_buffer.Length);
-
-                var t = _socket.Send(_buffer);
-                return t;
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-            }
-            return 0;
-        }*/
-
         public void ResizeBuffer(int size)
         {
             Array.Resize(ref _buffer, _buffer.Length + size);

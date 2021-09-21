@@ -1,10 +1,6 @@
 ﻿using Cliente.Listeners;
 using Shared;
 using System;
-using System.Net;
-using System.Net.Sockets;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Cliente
 {
@@ -15,12 +11,20 @@ namespace Cliente
         {
 
             Console.WriteLine("Connectando com servidor");
-            UDPListener server = new UDPListener("127.0.0.1", 7171, 1024, Server_OnReceiveHandler);
+            TCPListener servertcp = new TCPListener("127.0.0.1", 7171, 1024, Server_OnReceiveHandler);
+            servertcp.Connect();
 
-            ConWriter writer = new ConWriter(1);
-            writer.Send("Teste");
+            UDPListener server = new UDPListener("192.168.0.100", 7172, 1024, Server_OnReceiveHandler);
+            for (int i = 0; i < 10; i++)
+            {
 
-            server.Send(writer);
+                using (ConWriter writer = new ConWriter(0))
+                {
+                    writer.Send("Teste envia UDP" + i);
+
+                    server.Send(writer);
+                }
+            }
 
             string texto = "";
             while (texto != "fim")
@@ -38,11 +42,13 @@ namespace Cliente
         {
             Console.WriteLine("Aguardando");
 
+             
+
             Console.WriteLine(new
             {
-                
+
                 Name = reader.ReadString(),
-               
+
             });
 
         }

@@ -4,11 +4,10 @@ using System.Text;
 
 namespace Servidor.Models
 {
-    public class Player
+    public class Teams
     {
         public int Id;
-        public string Name;
-        public Position Position = new Position();
-        public int Team = -1;
+        public string Nome;
+        public List<Player> players;
     }
 }

@@ -1,22 +1,23 @@
-﻿using Servidor.Listeners;
+﻿using Servidor.Clients;
+using Servidor.Listeners;
 using Servidor.Models;
 using Shared;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Net.Sockets;
-using System.Threading;
 using System.Threading.Tasks;
-using TcpClient = Servidor.Clients.TcpClient;
 
 namespace Servidor
 {
     class Program
     {
         public static int idPlayer = 0;
-        public static Dictionary<Player, IClient> clients = new Dictionary<Player, IClient>();
-        public static UDPListener server;
+        public static Dictionary<IClient, Player> clientsTCP = new Dictionary<IClient, Player>();
+        public static Dictionary<IClient, Player> clientsUDP = new Dictionary<IClient, Player>();
+        public static UDPListener serverUDP;
+        public static TCPListener serverTCP;
+
+        public static List<Match> Matches = new List<Match>();
 
         static void Main(string[] args)
         {
@@ -32,46 +33,50 @@ namespace Servidor
             Task.Factory.StartNew(() =>
             {
                 Console.WriteLine(DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss") + "> Iniciando servidor");
-                server = new UDPListener("192.168.0.100", 7171, 1024, Server_OnAcceptHandler, Server_OnReceiveHandler);
-                server.StartServer();
+                serverUDP = new UDPListener("192.168.0.100", 7172, 1024, Server_OnAcceptHandler, Server_OnReceiveHandler);
+                serverUDP.StartServer();
+
+                serverTCP = new TCPListener("192.168.0.100", 7171, 1024, Server_OnAcceptHandler, Server_OnReceiveHandler, Server_OnDisconnectHandler);
+                serverTCP.StartServer();
+
                 Console.WriteLine(DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss") + "> Servidor iniciado");
 
-                while (true)
-                {
-                   // server.WaitConnection();
-                }
+
             });
 
             while (Console.ReadLine() != "fim") { };
 
         }
 
+        private static void Server_OnDisconnectHandler(IClient client)
+        {
+            clientsTCP.Remove(client);
+        }
 
         private static void Server_OnAcceptHandler(IClient client)
         {
-
             Player player = new Player();
             player.Id = idPlayer;
             player.Name = "Carlos " + idPlayer;
 
             Console.WriteLine(DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss") + "> " + client._socket.LocalEndPoint + " conectou");
 
-            clients.Add(player, client);
+            clientsTCP.Add(client, player);
 
             //Mando para o player todos os usuarios
-            foreach (var p in clients)
+            foreach (var p in clientsTCP)
             {
 
                 using (ConWriter writer = new ConWriter(1))
                 {
-                    Console.WriteLine(DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss") + ">  1 - Enviando " + p.Key.Id + " para " + player.Id);
-                    writer.Send(p.Key.Id);
-                    writer.Send(p.Key.Name);
+                    Console.WriteLine(DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss") + ">  1 - Enviando " + p.Value.Id + " para " + player.Id);
+                    writer.Send(p.Value.Id);
+                    writer.Send(p.Value.Name);
                     writer.Send(0F);
                     writer.Send(0F);
                     writer.Send(0F);
 
-                    writer.Send(p.Value == client);
+                    writer.Send(p.Key == client);
 
                     client.Send(writer);
                 }
@@ -79,12 +84,12 @@ namespace Servidor
 
 
             //Manda todos os players  o novo player
-            foreach (var p in clients)
+            foreach (var p in clientsTCP)
             {
-                if (p.Value != client)
+                if (p.Key != client)
                     using (ConWriter writer = new ConWriter(1))
                     {
-                        Console.WriteLine(DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss") + "> 2 - Enviando " + player.Id + " para " + p.Key.Id);
+                        Console.WriteLine(DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss") + "> 2 - Enviando " + player.Id + " para " + p.Value.Id);
 
                         writer.Send(player.Id);
                         writer.Send(player.Name);
@@ -110,14 +115,14 @@ namespace Servidor
             }
 
 
-            foreach (var client in clients)
+            foreach (var client in clientsTCP)
             {
-                if (!exceptions.Contains(client.Value))
+                if (!exceptions.Contains(client.Key))
                 {
                     using (ConWriter conWriter = new ConWriter())
                     {
                         conWriter.SetBuffer(buffer);
-                        client.Value.Send(conWriter);
+                        client.Key.Send(conWriter);
                     }
                 }
             }
@@ -125,70 +130,80 @@ namespace Servidor
 
         private static void Server_OnReceiveHandler(IClient client, ConReader reader)
         {
+
             using (ConReader t = reader)
             {
-
                 int tag = t.GetTag();
-                Console.WriteLine(tag);
-                switch (tag)
+
+                if (client is UDPClient && !clientsUDP.ContainsKey(client))
                 {
-                    case 1:
-                        //SendToAll(t.GetBuffer(), new List<Socket> { t.GetSocket() });
-                        Console.WriteLine(t.ReadString());
-                        ConWriter writer2 = new ConWriter(1);
-                        writer2.Send("Recebi desgraçado");
-                        client.Send(writer2);
-                      /*  int id = t.ReadInt();
-                        string nome = t.ReadString();
-                        float x = t.ReadFloat();
-                        float y = t.ReadFloat();
-                        float z = t.ReadFloat();
-                        bool isLocal = t.ReadBool();
+                    Console.WriteLine("Adicionando no UDP");
+                    clientsUDP.Add(client, new Player());
+                }
 
-                        foreach (var p in clients)
-                        {
-                            using (ConWriter conWriter = new ConWriter(1))
+                if (client is TCPClient)
+                {
+                    switch (tag)
+                    {
+                        case 1:
+
+                            int id = t.ReadInt();
+                            string nome = t.ReadString();
+                            float x = t.ReadFloat();
+                            float y = t.ReadFloat();
+                            float z = t.ReadFloat();
+                            bool isLocal = t.ReadBool();
+
+                            foreach (var p in clientsTCP)
                             {
-                                conWriter.endPoint = t.endPoint;
-
-                                conWriter.Send(id);
-                                conWriter.Send(nome);
-                                conWriter.Send(x);
-                                conWriter.Send(y);
-                                conWriter.Send(z);
-                                conWriter.Send(isLocal);
-                                p.Value.Send(conWriter);
+                                using (ConWriter conWriter = new ConWriter(1))
+                                {
+                                    conWriter.Send(id);
+                                    conWriter.Send(nome);
+                                    conWriter.Send(x);
+                                    conWriter.Send(y);
+                                    conWriter.Send(z);
+                                    conWriter.Send(isLocal);
+                                    p.Key.Send(conWriter);
+                                }
                             }
-                        }
-                      */
-                        break;
-                    case 2:
-                        using (ConWriter writer = new ConWriter(2))
-                        {
 
-                          /*  KeyValuePair<Player, IClient> player = clients.First(x1 => x1.Val == reader.GetSocket());
-                            player.Key.Position.X = t.ReadFloat();
-                            player.Key.Position.Y = t.ReadFloat();
-                            player.Key.Position.Z = t.ReadFloat();
+                            break;
+                        case 2:
+                            using (ConWriter writer = new ConWriter(2))
+                            {
+                                int playerId = t.ReadInt();
+                                KeyValuePair<IClient, Player> player = clientsTCP.First(x1 => { Console.WriteLine(x1.Value.Id + " " + playerId); return x1.Value.Id == playerId; });
+                                player.Value.Position.X = t.ReadFloat();
+                                player.Value.Position.Y = t.ReadFloat();
+                                player.Value.Position.Z = t.ReadFloat();
 
-                            writer.Send(player.Key.Id);
-                            writer.Send(player.Key.Position.X);
-                            writer.Send(player.Key.Position.Y);
-                            writer.Send(player.Key.Position.Z);
-                          
-                            Console.WriteLine("Enviando para todos mensagem de " + player.Key.Id);
-                            SendToAll(writer.GetBuffer(), new List<IClient>() { player.Value });
-                          */
-                        }
-                        break;
-                    default:
-                        break;
+                                writer.Send(player.Value.Id);
+                                writer.Send(player.Value.Position.X);
+                                writer.Send(player.Value.Position.Y);
+                                writer.Send(player.Value.Position.Z);
+
+                                Console.WriteLine("Enviando para todos mensagem de " + player.Value.Id);
+                                SendToAll(writer.GetBuffer(), new List<IClient>() { player.Key });
+
+                            }
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                else
+                {
+                    int playerId = reader.ReadInt();
+                    switch (tag)
+                    {
+                        case 1:
+                            Console.WriteLine(reader.ReadString());
+                            break;
+                    }
                 }
 
             }
-
-
-
         }
     }
 }
